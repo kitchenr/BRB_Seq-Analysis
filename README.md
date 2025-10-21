@@ -20,6 +20,8 @@ An example mapping file is posted here.
 
 Once the mapping file is created save it in your metadate folder along with your mouse genome reference files (example provided).
 
+In the metadata folder you should have your mapping file and the parameters file that you can download from this repo:
+
 In your Scripts folder you should have: BRB_MultiQC_SpikeIn_240116.sh and BRB_Seq_Muegge_241112_TwoStage_noMulti.sh.
 
 First you run:
