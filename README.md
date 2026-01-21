@@ -79,3 +79,12 @@ to determine read number and send off for the Full run.
 
 
 After you can start the Full run Analysis
+
+# Richard's Notes
+
+## Checking Job Status
+squeue -u yourWUSTLkey
+
+## Code for removing end of line characters (\r or \n)
+sed 's/\r$//' input.txt > output.txt
+
