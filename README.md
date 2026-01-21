@@ -1,90 +1,119 @@
 # BRB_Seq-Analysis
-Analysis for Spike in and Full Run data from BRB-Seq on the WashU HTCF
+Analysis for Spike in and Full Run data from BRB-Seq on the WashU HTCF  
 
-## Spike In Data
-One Spike In data is returned we need to check the quality of the data to determine read numbers for the full run.
+## Spike In
+### Overview of Spike In Data
+**Goal of Spike-In run:** Assess data quality and determine appropriate read depth for the full sequencing run.  
 
-Create a new project folder with subdirectories: 
-data        
-        Read 1
-        Read 2
-        Index 1
-        Index 2
-metadata
-        Parameters_mouse.txt
-        Mapping File.txt
-scripts
-         BRB_Seq_Muegge_241112_TwoStage_noMulti.sh
-         BRB_MultiQC_SpikeIn_240116.sh
-spike_in_analysis
+**Input:** BRB-Seq FASTQs (R1, R2) and the Alithea BRB-Seq Excel metadata template.  
 
-To start: 
-After Spike In you get a file named {Project Name}_Alithea_BRBSEQ_Pipeline_V5B_Primerset_Template.xlsx and R1,R2,I1,I2 files.
+**Output:** MultiQC HTML report used to calculate repooling/read numbers for the full run.  
 
-The Excel sheet contains your barcodes, well locations and sample names.
+## Project Directory Structure
+Create a new project directory with the following structure:  
 
-We need to start by populating the "Mapping_File" tab of that sheet. You can do that by pulling / copying SampleName and Barcode information from the ReverseTranscription tab.
-The group column doesn't matter a lot at this point, but if you have real group information enter it now as a placeholder.
-An example mapping file is posted here.
+PROJECT_NAME/  
+├── data/  
+│ ├── R1  
+│ ├── R2  
+│ ├── I1  
+│ ├── I2  
+├── metadata/  
+│ ├── Mapping_File.txt (to be made and uploaded)  
+│ └── Parameters_mouse.txt (or human paramaters file)  
+├── scripts/  
+│ ├── BRB_Seq_Muegge_241112_TwoStage_noMulti.sh  
+│ └── BRB_MultiQC_SpikeIn_240116.sh  
+└── spike_in_analysis/  
 
-Once the mapping file is created save it in your metadate folder along with your mouse genome reference files (example provided).
+## Step 1: Create the Mapping File
+After Spike In you get a file named:   {Project_Name}_Alithea_BRBSEQ_Pipeline_V5B_Primerset_Template.xlsx  
+The Excel sheet contains your barcodes, well locations and sample names.  
+```
+a. Open the Excel template.  
+b. Navigate to the Mapping_File tab.  
+c. Populate it by copying the following columns from the ReverseTranscription tab:  
+        i. SampleName  
+        ii. Barcode  
+d. The Group column is optional at this stage. If known, add real group information; otherwise, use placeholders.  
+e. Save the mapping file as a tab-delimited text file and upload to your metadata/ folder on the HTCF.  
+        i. An example mapping file is posted here.  
+f. Remove End-of-Line Characters (\r or \n)  
+        i. sed 's/\r$//' input.txt > output.txt  
+g. In the metadata folder you should have your mapping file and the parameters file.
+```
 
-In the metadata folder you should have your mapping file and the parameters file that you can download from this repo:
+## Step 2: Spike-In Processing Pipeline: BRB_Seq_Muegge_241112_TwoStage_noMulti.sh  
+In your Scripts folder you should have: BRB_MultiQC_SpikeIn_240116.sh and BRB_Seq_Muegge_241112_TwoStage_noMulti.sh.  
 
-In your Scripts folder you should have: BRB_MultiQC_SpikeIn_240116.sh and BRB_Seq_Muegge_241112_TwoStage_noMulti.sh.
+We will use BRB_Seq_Muegge_241112_TwoStage_noMulti.sh first.   
+Run Type: Spike-in   Output: QC report  
 
-First you run:
+### What this Script Does
+For each sample in the mapping file this script: 
+```
+1. Demultiplexes with cutadapt  
+2. Performs pre-alignment QC with FastQC  
+3. Removes sequencing adapters and polyA tails with cutadapt  
+4. Aligns reads to the reference genome using STAR  
+5. Performs post-alignment QC using:  
+        a. FastQC  
+        b. RSeQC
+        c. Qualimap  
+6. Assigns features using Subread FeatureCounts
+```
+### Input for BRB_Seq_Muegge_241112_TwoStage_noMulti.sh  
+```
+1. Sample <> Barcode mapping file with paths to Read1 and Read2 fastq files  
+        a. This is the metadata file you previously generated and uploaded  
+2. Parameters file with paths to genome annotation files and STAR  
+        a. This is the Parameters_mouse.txt (or human paramaters file)
+```
+### Usage of BRB_Seq_Muegge_241112_TwoStage_noMulti.sh
+**Usage Template**  
+sbatch BRB_Seq_Muegge_241112_TwoStage_noMulti.sh PROJECT_DIRECTORY MAPPING_FILE PARAMETERS_FILE  
+  
+**Usage Examples**   
+sbatch --array=1-8%8 scripts/BRB_Seq_Muegge_241112_TwoStage_noMulti.sh spike_in_analysis/ metadata/spikein_map.txt metadata/parameters.csv  
+  
+sbatch --array=1-48%20 scripts/SpikeIn/BRB_Seq_Muegge_241112_TwoStage_noMulti.sh spike_in_analysis_test/ metadata/Test.txt metadata/parameters_mouse.txt  
+  
+**Notes**  
+1. Change arrary 1-8 to number of your samples.   
+2. %8 controls how many runs occur at the same time.  
 
-Run Type: Spike-in   Output: QC report
-BRB_Seq_Muegge_241112_TwoStage_noMulti.sh
-        input: 1) Sample <> Barcode mapping file with paths to Read1 and Read2 fastq files
-               2) Parameters file with paths to genome annotation files and STAR database.
+## Step 3: Spike-In Processing Pipeline: BRB_MultiQC_SpikeIn_240116.sh
+We will now use BRB_MultiQC_SpikeIn_240116.sh.   
+Run Type: Spike-in   Output: QC report   
+### What this Script Does
+This script contains wrapper scripts which:  
+```
+1. Aggregates feature count outputs across all samples from the output of BRB_Seq_Muegge_241112_TwoStage_noMulti.sh into a single matrix 
+2. Generates a consolidated MultiQC HTML report
+```
 
-        For each sample in the mapping file this script 1) demultiplexes with cutadapt,
-        2) assess quality with Fastqc, 3) removes sequencing adapters and polyA tails
-        with cutadapt, 4) aligns reads to the reference genome with STAR, 4) generates
-        post-alignment QC with Fastqc, RSeQC, and Qualimap, and 5) assigns features with
-        subReads FeatureCounts.
+### Input for BRB_Seq_Muegge_241112_TwoStage_noMulti.sh  
+Output of of BRB_Seq_Muegge_241112_TwoStage_noMulti.sh
 
-Usage Template:
-sbatch BRB_Seq_Muegge_241112_TwoStage_noMulti.sh PROJECT_DIRECTORY MAPPING_FILE PARAMETERS_FILE
-Usage Example:
-sbatch --array=1-8%8 scripts/BRB_Seq_*.sh spike_in_analysis/ metadata/spikein_map.txt metadata/parameters.csv
-sbatch --array=1-48%20 scripts/SpikeIn/BRB_Seq_*.sh spike_in_analysis_test/ metadata/Test.txt metadata/parameters_mouse.txt
+### Usage of BRB_MultiQC_SpikeIn_240116.sh
+**Usage Template**  
+sbatch BRB_MultiQC_SpikeIn_240116.sh PROJECT_DIR LIBRARY_NAME  
+  
+**Usage Example**  
+sbatch scripts/SpikeIn/BRB_MultiQC_SpikeIn_240116.sh spike_in_analysis/ Test  
 
-Change arrary 1-8 to number of your samples. %8 controls how many runs occur at the same time.
-
-Then run: 
-BRB_MultiQC_SpikeIn_240116.sh
-        input: output of of BRB_Seq_Muegge_241112_TwoStage_noMulti.sh
-
-        This script contains wrapper scripts to generate 1) an aggregated count matrix of
-        all the assigned features from each sample from the output of s01, and 2) a
-        html quality report generated by calling MultiQC
-        
-
-Usage Template:
-
-sbatch BRB_MultiQC_SpikeIn_240116.sh PROJECT_DIR LIBRARY_NAME
-
-Usage Example:
-
-sbatch scripts/SpikeIn/BRB_MultiQC_SpikeIn_240116.sh spike_in_analysis/ Test
-
-After this you will end up with  a MultiQC html were you can look at data quality.
-
-You then need to copy the table from the html to this excel sheet:
-Evenness_Repooling_Template_2025_1017.xlsx
-to determine read number and send off for the Full run.
+## Step 4: Determine Read Depth for Full Run
+Step 3 will result in a MultiQC html where you can look at data quality.  
+```
+1. Open the generated MultiQC HTML report
+2. Copy the table into Evenness_Repooling_Template_2025_1017.xlsx
+3. Use this spreadsheet to calculate recommended read depth
+4. Send these values to Brian to discuss need for repooling
+```
 
 
-After you can start the Full run Analysis
-
-# Richard's Notes
+# Useful Commands on HTCF
 
 ## Checking Job Status
 squeue -u yourWUSTLkey
-
-## Code for removing end of line characters (\r or \n)
-sed 's/\r$//' input.txt > output.txt
 
